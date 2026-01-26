@@ -1,0 +1,302 @@
+{
+  "name": "Taxping ai automation copy(remodel)",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "cronExpression",
+              "expression": "0 9 * * *"
+            }
+          ]
+        }
+      },
+      "id": "54a8ae3b-610b-443c-8210-0c61dc875dd2",
+      "name": "Daily Trigger",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1,
+      "position": [
+        -560,
+        -544
+      ]
+    },
+    {
+      "parameters": {
+        "url": "https://konapymngpsayztjhfov.supabase.co/rest/v1/deadlines?select=*,clients(*,firms(*))&status=eq.active&last_notified_at=is.null",
+        "sendHeaders": true,
+        "specifyHeaders": "json",
+        "jsonHeaders": "{\n  \"apikey\": \"sb_secret_vHUeURkEg7oZLQhXkA_49w_CdS1mjLa\",\n  \"Authorization\": \"Bearer sb_secret_vHUeURkEg7oZLQhXkA_49w_CdS1mjLa\",\n  \"Content-Type\": \"application/json\"\n}",
+        "options": {}
+      },
+      "id": "bffbfd96-77a6-41b2-b056-0a8fb025b8bd",
+      "name": "Fetch Deadlines",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [
+        -336,
+        -544
+      ],
+      "alwaysOutputData": false
+    },
+    {
+      "parameters": {
+        "jsCode": "const MS_PER_DAY = 86400000;\nconst today = new Date();\ntoday.setHours(0, 0, 0, 0);\n\nconst results = items\n  .map(item => {\n    const raw = item.json.deadline_date;\n    if (!raw) return null;\n\n    const deadline = new Date(raw + \"T00:00:00\");\n    deadline.setHours(0, 0, 0, 0);\n\n    const daysLeft = Math.round((deadline - today) / MS_PER_DAY);\n\n    return {\n      json: {\n        ...item.json,\n        days_left: daysLeft\n      }\n    };\n  })\n  .filter(i => i !== null);\n\nreturn results;\n"
+      },
+      "id": "b32319a6-9088-4c6d-8bf0-a9eaed07df53",
+      "name": "Calculate Days Left",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -112,
+        -544
+      ]
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "=You MUST return only valid JSON like this:\\n{\\n  \\\"email_subject\\\": \\\"\\\",\\n  \\\"email_body\\\": \\\"\\\",\\n  \\\"urgency_level\\\": \\\"low | medium | high | critical\\\"\\n}\\n\\nFirm: {{ $json.clients.firms.firm_name }}\\nClient: {{ $json.clients.name }}\\nDeadline: {{ $json.deadline_type }}\\nDate: {{ $json.deadline_date }}\\nDays left: {{ $json.days_left }}\"\n\nRules:\n- Professional business tone\n- Short and clear\n- No emojis\n- No slang\n- Use firm name naturally in signature",
+        "options": {
+          "systemMessage": "You are a professional compliance reminder assistant for tax firms. Generate short, polite reminders in a professional tone. No emojis or slang."
+        }
+      },
+      "id": "8067df06-33bb-4cd2-8055-4599bf99b2b1",
+      "name": "Generate Reminder Messages",
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 3.1,
+      "position": [
+        112,
+        -544
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const originals = $items(\"Calculate Days Left\");\nconst aiResults = $items(\"Generate Reminder Messages\");\n\nconst merged = originals.map((item, index) => {\n  const original = item.json;\n  const aiRaw = aiResults[index]?.json || {};\n\n  // Safely parse AI output if needed\n  let ai = {};\n  if (aiRaw.output) {\n    try {\n      ai = typeof aiRaw.output === \"string\"\n        ? JSON.parse(aiRaw.output)\n        : aiRaw.output;\n    } catch {\n      ai = {};\n    }\n  } else {\n    ai = aiRaw;\n  }\n\n  // Handle relations safely\n  const client = Array.isArray(original.clients)\n    ? original.clients[0] || {}\n    : original.clients || {};\n\n  const firm = Array.isArray(client.firms)\n    ? client.firms[0] || {}\n    : client.firms || {};\n\n  return {\n    json: {\n      // Preserve EVERYTHING\n      ...original,\n      ...aiRaw,\n\n      // Force AI content to survive\n      email_subject: ai.email_subject || aiRaw.email_subject || original.email_subject || null,\n      email_body: ai.email_body || aiRaw.email_body || original.email_body || null,\n      urgency_level: ai.urgency_level || aiRaw.urgency_level || original.urgency_level || null,\n\n      // IDs\n      firm_id: firm.id || null,\n      client_id: client.id || null,\n      deadline_id: original.id || null,\n\n      // Channel\n      _channel: \"email\",\n\n      // Client\n      client_name: client.name || null,\n      recipient_email: client.email || null,\n      phone: client.phone || null,\n\n      // Firm\n      firm_name: firm.firm_name || null,\n      sender_name: firm.sender_name || null,\n      sender_email: firm.sender_email || null,\n\n      // SMTP\n      sender_smtp_host: firm.smtp_host || null,\n      sender_smtp_port: firm.smtp_port || null,\n      sender_smtp_user: firm.smtp_user || null,\n      sender_smtp_password: firm.smtp_password || null\n    }\n  };\n});\n\nreturn merged;\n\n"
+      },
+      "id": "602ebfa2-783f-4f8e-a0a4-7efa177e0061",
+      "name": "Shape Data for Sending",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        464,
+        -544
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://konapymngpsayztjhfov.supabase.co/rest/v1/reminder_logs",
+        "sendHeaders": true,
+        "specifyHeaders": "json",
+        "jsonHeaders": "{\n  \"apikey\": \"sb_secret_vHUeURkEg7oZLQhXkA_49w_CdS1mjLa\",\n  \"Authorization\": \"Bearer sb_secret_vHUeURkEg7oZLQhXkA_49w_CdS1mjLa\",\n  \"Content-Type\": \"application/json\",\n  \"Prefer\": \"return=representation\"\n}\n",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"firm_name\": \"{{ $json.firm_name }}\",\n  \"client_name\": \"{{ $json.client_name }}\",\n  \"deadline_type\": \"{{ $json.deadline_type }}\",\n  \"deadline_date\": \"{{ $json.deadline_date }}\",\n\n  \"channel\": \"email\",\n  \"status\": \"{{ $json.email_status || 'sent' }}\",\n\n  \"recipient_email\": \"{{ $json.recipient_email }}\",\n  \"sender_email\": \"{{ $json.sender_email }}\",\n\n  \"message_id\": \"{{ $json.email_message_id }}\",\n  \"sent_at\": \"{{ $json.sent_at }}\"\n}",
+        "options": {}
+      },
+      "id": "99b267c1-188e-48d7-8104-112718226baf",
+      "name": "Log Reminder Success",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [
+        1136,
+        -640
+      ]
+    },
+    {
+      "parameters": {
+        "method": "PATCH",
+        "url": "=https://konapymngpsayztjhfov.supabase.co/rest/v1/deadlines?id=eq.{{ $json.deadline_id }}",
+        "sendHeaders": true,
+        "specifyHeaders": "json",
+        "jsonHeaders": "{\n  \"apikey\": \"sb_secret_vHUeURkEg7oZLQhXkA_49w_CdS1mjLa\",\n  \"Authorization\": \"Bearer sb_secret_vHUeURkEg7oZLQhXkA_49w_CdS1mjLa\",\n  \"Content-Type\": \"application/json\"\n}\n",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\"last_notified_at\":\"{{ $now.toISO() }}\"}",
+        "options": {}
+      },
+      "id": "958820dc-511e-4c18-bef8-26013ca6ab83",
+      "name": "Update Last Notified",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [
+        1136,
+        -448
+      ]
+    },
+    {
+      "parameters": {
+        "model": {
+          "__rl": true,
+          "mode": "list",
+          "value": "gpt-4.1-mini"
+        },
+        "builtInTools": {},
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatOpenAi",
+      "typeVersion": 1.3,
+      "position": [
+        112,
+        -336
+      ],
+      "id": "cadbd61c-c612-4c82-986b-76a2777147dd",
+      "name": "OpenAI Chat Model",
+      "credentials": {
+        "openAiApi": {
+          "id": "OM7SLLptl2DPbirz",
+          "name": "n8n free OpenAI API credits"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// Result from Send Email node (delivery info, messageId, errors, etc.)\nconst emailResult = $json || {};\n\n// Original structured data from Shape Data node\nconst original = $items(\"Shape Data for Sending\")[0]?.json || {};\n\n// Merge safely\nreturn [\n  {\n    json: {\n      ...original,      // preserve everything from shape data\n      email_result: emailResult, // keep full send-email response under one key\n\n      // Optional convenience fields (nice for logging tables)\n      email_status: emailResult?.success === false ? \"failed\" : \"sent\",\n      email_message_id: emailResult?.messageId || null,\n      email_error: emailResult?.error || null,\n      sent_at: new Date().toISOString()\n    }\n  }\n];\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        912,
+        -544
+      ],
+      "id": "23a269ec-43b6-4600-8026-5031bd1f5812",
+      "name": "Code in JavaScript"
+    },
+    {
+      "parameters": {
+        "toRecipients": "={{ $json.recipient_email }}",
+        "subject": "={{ $json.email_subject }}",
+        "bodyContent": "={{ $json.email_body }}",
+        "additionalFields": {}
+      },
+      "type": "n8n-nodes-base.microsoftOutlook",
+      "typeVersion": 2,
+      "position": [
+        688,
+        -544
+      ],
+      "id": "c3cd2292-5102-4138-98a6-e3c9c75cb28a",
+      "name": "Send a message",
+      "webhookId": "d554ddf2-1581-4708-8195-9a8ee8bfbe34",
+      "credentials": {
+        "microsoftOutlookOAuth2Api": {
+          "id": "RiYC3AL0kpYMAfUa",
+          "name": "Microsoft Outlook account 2"
+        }
+      }
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Daily Trigger": {
+      "main": [
+        [
+          {
+            "node": "Fetch Deadlines",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Fetch Deadlines": {
+      "main": [
+        [
+          {
+            "node": "Calculate Days Left",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Calculate Days Left": {
+      "main": [
+        [
+          {
+            "node": "Generate Reminder Messages",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Generate Reminder Messages": {
+      "main": [
+        [
+          {
+            "node": "Shape Data for Sending",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Shape Data for Sending": {
+      "main": [
+        [
+          {
+            "node": "Send a message",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Log Reminder Success": {
+      "main": [
+        []
+      ]
+    },
+    "OpenAI Chat Model": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "Generate Reminder Messages",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code in JavaScript": {
+      "main": [
+        [
+          {
+            "node": "Log Reminder Success",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Update Last Notified",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send a message": {
+      "main": [
+        [
+          {
+            "node": "Code in JavaScript",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": true,
+  "settings": {
+    "executionOrder": "v1",
+    "availableInMCP": false
+  },
+  "versionId": "fb5285fe-7680-4acd-a881-9364178185d6",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "d94e0bbe846c408a14cf810a554cd636ee70fb8233ef1fe964c18353a22267d8"
+  },
+  "id": "TC5BCvyK8e8whwxY",
+  "tags": []
+}
