@@ -24,9 +24,8 @@
     {
       "parameters": {
         "url": "https://konapymngpsayztjhfov.supabase.co/rest/v1/deadlines?select=*,clients(*,firms(*))&status=eq.active&last_notified_at=is.null",
-        "sendHeaders": true,
-        "specifyHeaders": "json",
-        "jsonHeaders": "{\n  \"apikey\": \"sb_secret_vHUeURkEg7oZLQhXkA_49w_CdS1mjLa\",\n  \"Authorization\": \"Bearer sb_secret_vHUeURkEg7oZLQhXkA_49w_CdS1mjLa\",\n  \"Content-Type\": \"application/json\"\n}",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "supabaseApi",
         "options": {}
       },
       "id": "bffbfd96-77a6-41b2-b056-0a8fb025b8bd",
@@ -37,7 +36,13 @@
         -336,
         -544
       ],
-      "alwaysOutputData": false
+      "alwaysOutputData": false,
+      "credentials": {
+        "supabaseApi": {
+          "id": "1yWVu4mVieavIkwn",
+          "name": "Supabase account 3"
+        }
+      }
     },
     {
       "parameters": {
@@ -86,9 +91,8 @@
       "parameters": {
         "method": "POST",
         "url": "https://konapymngpsayztjhfov.supabase.co/rest/v1/reminder_logs",
-        "sendHeaders": true,
-        "specifyHeaders": "json",
-        "jsonHeaders": "{\n  \"apikey\": \"sb_secret_vHUeURkEg7oZLQhXkA_49w_CdS1mjLa\",\n  \"Authorization\": \"Bearer sb_secret_vHUeURkEg7oZLQhXkA_49w_CdS1mjLa\",\n  \"Content-Type\": \"application/json\",\n  \"Prefer\": \"return=representation\"\n}\n",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "supabaseApi",
         "sendBody": true,
         "specifyBody": "json",
         "jsonBody": "={\n  \"firm_name\": \"{{ $json.firm_name }}\",\n  \"client_name\": \"{{ $json.client_name }}\",\n  \"deadline_type\": \"{{ $json.deadline_type }}\",\n  \"deadline_date\": \"{{ $json.deadline_date }}\",\n\n  \"channel\": \"email\",\n  \"status\": \"{{ $json.email_status || 'sent' }}\",\n\n  \"recipient_email\": \"{{ $json.recipient_email }}\",\n  \"sender_email\": \"{{ $json.sender_email }}\",\n\n  \"message_id\": \"{{ $json.email_message_id }}\",\n  \"sent_at\": \"{{ $json.sent_at }}\"\n}",
@@ -101,15 +105,20 @@
       "position": [
         1136,
         -640
-      ]
+      ],
+      "credentials": {
+        "supabaseApi": {
+          "id": "1yWVu4mVieavIkwn",
+          "name": "Supabase account 3"
+        }
+      }
     },
     {
       "parameters": {
         "method": "PATCH",
         "url": "=https://konapymngpsayztjhfov.supabase.co/rest/v1/deadlines?id=eq.{{ $json.deadline_id }}",
-        "sendHeaders": true,
-        "specifyHeaders": "json",
-        "jsonHeaders": "{\n  \"apikey\": \"sb_secret_vHUeURkEg7oZLQhXkA_49w_CdS1mjLa\",\n  \"Authorization\": \"Bearer sb_secret_vHUeURkEg7oZLQhXkA_49w_CdS1mjLa\",\n  \"Content-Type\": \"application/json\"\n}\n",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "supabaseApi",
         "sendBody": true,
         "specifyBody": "json",
         "jsonBody": "={\"last_notified_at\":\"{{ $now.toISO() }}\"}",
@@ -122,7 +131,13 @@
       "position": [
         1136,
         -448
-      ]
+      ],
+      "credentials": {
+        "supabaseApi": {
+          "id": "1yWVu4mVieavIkwn",
+          "name": "Supabase account 3"
+        }
+      }
     },
     {
       "parameters": {
@@ -292,7 +307,7 @@
     "executionOrder": "v1",
     "availableInMCP": false
   },
-  "versionId": "fb5285fe-7680-4acd-a881-9364178185d6",
+  "versionId": "0faa2551-cb8f-4da8-9c05-0902c6ca5295",
   "meta": {
     "templateCredsSetupCompleted": true,
     "instanceId": "d94e0bbe846c408a14cf810a554cd636ee70fb8233ef1fe964c18353a22267d8"
